@@ -2,18 +2,18 @@
    Guarda o app no aparelho para abrir sem internet. Não toca nos seus dados:
    eles ficam no localStorage do navegador, que este arquivo não acessa.
    Ao publicar uma nova versão do app, mude o número em VERSION. */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = 'controle-gastos-' + VERSION;
 
 // Só o index.html é indispensável. Se um dos outros arquivos faltar no servidor,
 // o service worker continua instalando (na v1, um arquivo faltando derrubava tudo).
 const OPCIONAIS = [
   'manifest.webmanifest',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-maskable-512.png',
-  'icons/apple-touch-icon.png',
-  'icons/favicon-32.png',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-maskable-512.png',
+  'apple-touch-icon.png',
+  'favicon-32.png',
   'diagnostico.html'
 ];
 

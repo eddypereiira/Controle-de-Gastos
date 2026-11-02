@@ -109,6 +109,7 @@
         if (bom && comum && ic.sizes === '192x192') ok192 = true; if (bom && comum && ic.sizes === '512x512') ok512 = true;
       }
       add(ok192 && ok512 ? 'ok' : 'erro', 'Ícones PNG comuns (any) de 192x192 e 512x512 acessíveis', (ok192 ? '192 ok' : '192 com problema') + ', ' + (ok512 ? '512 ok' : '512 com problema'));
+      if (!(ok192 && ok512)) add('aviso', 'Onde ficam os ícones', 'Os arquivos icon-192.png, icon-512.png e icon-maskable-512.png devem estar no repositório do GitHub na mesma pasta do index.html, soltos (sem subpasta). Envie-os com Add file > Upload files.');
     }
 
     // service worker
