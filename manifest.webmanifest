@@ -15,6 +15,7 @@
     "finance",
     "productivity"
   ],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "icons/icon-192.png",

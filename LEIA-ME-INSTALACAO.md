@@ -1,83 +1,88 @@
-# Controle de Gastos: instalar no Android e no computador
+# Controle de Gastos (versão 2): instalar no Android e no computador
 
-Este pacote é o seu app transformado em PWA (aplicativo instalável). Depois de instalado, ele tem ícone próprio na tela inicial, abre em tela cheia sem escolher navegador e funciona sem internet.
+Esta versão corrige uma fragilidade do service worker e inclui uma página de diagnóstico, `diagnostico.html`, que mostra exatamente o que o Chrome do seu celular enxerga no site publicado. Seus gastos não são alterados por nada neste pacote.
 
-O PWA precisa ficar num endereço HTTPS uma única vez, só para o Android conseguir instalar. Depois de instalado, o uso do dia a dia não depende de internet.
+## O que mudou em relação à versão 1
 
-## Passo 0: faça o backup ANTES de qualquer coisa
+1. **Service worker mais resistente (`sw.js`, versão `v2`).** Na versão 1, se qualquer arquivo da lista não existisse no site publicado (um ícone esquecido no upload, por exemplo), o service worker inteiro deixava de instalar. Sem service worker, o app não abre offline e o Chrome pode não oferecer a instalação. Agora só o `index.html` é indispensável, e o resto é guardado se existir. Isso foi testado simulando um site com arquivos faltando.
+2. **Outras páginas do site não são mais tratadas como o app.** O service worker só devolve o app para o endereço principal.
+3. **`diagnostico.html`.** Verifica manifesto, ícones, service worker, HTTPS e o evento de instalação do Chrome, e gera um relatório para copiar.
+4. **Manifesto.** Acrescentei `prefer_related_applications: false`. O resto é igual.
+5. O app em si (visual, funções, backup) não mudou, salvo um link para o diagnóstico no cartão "Instalar no aparelho".
 
-Seus dados ficam guardados no navegador, separados por endereço. O app instalado terá um endereço novo, então ele começa vazio e você vai restaurar o backup nele. Seus dados atuais não são apagados por nada neste processo, desde que você não limpe os dados do Chrome nem apague o arquivo antigo.
+## Passo 0: backup antes de mexer em qualquer coisa
 
-1. Abra o app que você usa hoje (o arquivo `controle-de-gastos-offline.html` ou o link do claude.ai).
-2. Toque em **Backup** e depois em **Baixar backup (.json)**.
-3. Guarde o arquivo `controle-gastos-AAAA-MM-DD.json` em mais de um lugar (Google Drive, e-mail para você mesmo, computador).
-4. Se o download não funcionar, use **Copiar backup** e cole o texto num bloco de notas.
+1. Abra o app que você usa agora, vá em **Backup** e toque em **Baixar backup (.json)**.
+2. Guarde o arquivo em mais de um lugar (Google Drive, e-mail para você mesmo).
+3. **Não limpe os dados do Chrome nem use "Limpar e redefinir" nas configurações do site.** Isso apaga os gastos guardados no navegador.
 
-Mantenha o arquivo `.html` antigo até conferir que tudo foi restaurado no app novo.
+Substituir os arquivos no GitHub não apaga nada: os gastos ficam no navegador do seu celular, não no GitHub.
 
-## Passo 1: publicar (grátis, uns 5 minutos)
+## Passo 1: substituir os arquivos no GitHub Pages
 
-Opção recomendada: GitHub Pages. O repositório só guarda o código do app. Seus gastos nunca vão para lá.
+1. Descompacte este zip.
+2. No seu repositório, clique em **Add file > Upload files**.
+3. Arraste **o conteúdo** da pasta `controle-gastos-pwa` (não a pasta em si): `index.html`, `manifest.webmanifest`, `sw.js`, `diagnostico.html` e a pasta `icons`. Arquivos com o mesmo nome substituem os antigos.
+4. Clique em **Commit changes**.
+5. Abra a aba **Actions** do repositório e espere o item "pages build and deployment" ficar verde (1 a 2 minutos).
 
-1. Crie uma conta em github.com, se ainda não tiver.
-2. Clique em **New repository**, dê o nome `controle-gastos`, deixe **Public** e crie.
-3. Descompacte o zip. Em **Add file > Upload files**, arraste para a página estes itens que estão dentro da pasta `controle-gastos-pwa`: `index.html`, `manifest.webmanifest`, `sw.js` e a pasta `icons`. Arraste o conteúdo da pasta, não a pasta em si. Clique em **Commit changes**.
-4. Vá em **Settings > Pages**. Em **Branch**, escolha `main` e `/ (root)`, e clique em **Save**.
-5. Espere 1 a 2 minutos. O endereço será `https://SEU-USUARIO.github.io/controle-gastos/`.
+Os arquivos precisam ficar na **raiz** do repositório, ao lado do `index.html`, e a pasta `icons` precisa conter os 5 PNG diretamente (não pode ser `icons/icons/...`).
 
-Alternativas: Netlify Drop (app.netlify.com/drop, arraste a pasta) ou Cloudflare Pages. Qualquer hospedagem HTTPS serve.
+## Passo 2: conferir no navegador que os arquivos existem
 
-Escolha o endereço com calma. Os dados ficam ligados a ele, e mudar de endereço depois exige novo backup e restauração.
+Troque `USUARIO` e `REPO` pelos seus. Cada endereço deve mostrar o conteúdo, não "404":
 
-## Passo 2: instalar no Android
+- `https://USUARIO.github.io/REPO/manifest.webmanifest` mostra um texto JSON.
+- `https://USUARIO.github.io/REPO/sw.js` mostra código.
+- `https://USUARIO.github.io/REPO/icons/icon-512.png` mostra o ícone verde com a carteira.
+- `https://USUARIO.github.io/REPO/icons/icon-192.png` idem, menor.
 
-1. No Chrome do celular, abra o endereço do passo 1.
-2. Abra o menu do Chrome (três pontos) e toque em **Instalar app**. Em algumas versões aparece como **Adicionar à tela inicial** e depois **Instalar**. Na aba Backup do app também pode aparecer o botão **Instalar o app**.
-3. Confirme. O ícone verde "Gastos" aparece na tela inicial e na gaveta de apps.
-4. Toque no ícone. O app abre direto, sem barra de endereço e sem pedir navegador.
+Se algum mostrar 404, o arquivo não está no lugar certo do repositório. Esse é o primeiro suspeito quando o Chrome só oferece "Criar atalho".
 
-## Passo 3: restaurar seus dados no app novo
+## Passo 3: rodar o diagnóstico no celular
 
-1. Abra o app pelo ícone e vá em **Backup**.
-2. Em **Restaurar backup**, toque em **Escolher arquivo** e selecione o `.json` do passo 0.
-3. O app mostra o resumo do que será restaurado. Confira e toque em **Substituir meus dados**.
-4. Veja o mês atual e o histórico para conferir se está tudo ali.
+1. No Chrome do Android, abra `https://USUARIO.github.io/REPO/diagnostico.html`.
+2. Espere uns 10 segundos. A página lista cada verificação com ✓ (ok), ✗ (problema), ! (aviso) ou i (informação).
+3. Toque em **Copiar relatório** e cole o texto numa mensagem para quem vai ajudar na análise.
 
-## Passo 4: testar o modo offline
+O diagnóstico só lê arquivos do site e o estado do Chrome. Ele não abre nem altera os seus gastos.
 
-1. Abra o app pelo ícone com internet, pelo menos uma vez. Isso guarda o app no aparelho.
-2. Ative o modo avião.
-3. Feche o app e abra de novo pelo ícone. Ele deve abrir normalmente.
-4. Registre um gasto, edite, feche e abra de novo. Os dados continuam lá.
+## Passo 4: atualizar o celular e instalar
+
+1. Abra o endereço do app com internet, espere alguns segundos, feche a aba e abra de novo. O service worker novo assume sozinho e os dados continuam lá.
+2. Abra o menu do Chrome (três pontos). Deve aparecer **Instalar app**. Também pode aparecer o botão **Instalar o app** na aba Backup.
+3. Confirme. O ícone verde "Gastos" aparece na tela inicial e o app abre em tela cheia, sem escolher navegador.
+4. Se o app já foi instalado antes, o menu mostra **Abrir app** em vez de **Instalar app**.
+
+## Se o diagnóstico estiver todo ✓ e ainda aparecer só "Criar atalho"
+
+O Chrome do Android cria o app instalado (WebAPK) com ajuda de servidores do Google. Isso pode falhar por causas do aparelho, que o site não controla:
+
+- Chrome desatualizado (atualize pela Play Store).
+- Google Play Services desatualizado ou ausente.
+- Aba anônima ou perfil de trabalho restrito.
+- "Site para computador" ligado no menu do Chrome (desligue e abra de novo).
+- Economia de dados ou navegador diferente do Chrome (use o Chrome ou o Samsung Internet).
+
+Nesse caso, envie o relatório do diagnóstico para análise.
 
 ## No computador
 
-1. Abra o mesmo endereço no Chrome ou no Edge.
-2. Clique no ícone de instalar, no fim da barra de endereço, ou em menu > **Instalar Controle de Gastos**.
-3. Ele abre numa janela própria e aparece no menu Iniciar ou no Launchpad. Em tela larga, o layout usa duas colunas.
-4. O computador tem seus próprios dados, separados do celular. Para levar dados de um aparelho para o outro, use Backup e Restaurar.
+Abra o endereço no Chrome ou no Edge e clique no ícone de instalar no fim da barra de endereço. O computador tem dados próprios, separados do celular. Para levar dados de um aparelho ao outro, use Backup e Restaurar.
 
-## Cuidados com os dados
+## Restaurar dados, se precisar
 
-- Os dados ficam no armazenamento do navegador, só neste aparelho. Não há sincronização entre celular e computador.
-- Desinstalar o app ou limpar os dados do Chrome para o site apaga os dados. Faça backup de vez em quando, principalmente antes de mexer nessas opções.
-- O app pede ao Android para proteger o armazenamento contra limpeza automática, mas isso não é garantido. O backup é a sua garantia.
+No app, **Backup > Restaurar backup > Escolher arquivo**, selecione o `.json` e confirme **Substituir meus dados**. O app mostra o resumo antes de substituir.
 
 ## Atualizar o app no futuro
 
-Quando você alterar o app, mude o número em `const VERSION = 'v1';` no arquivo `sw.js` (para `v2`, `v3` e assim por diante) e envie os arquivos de novo. Os aparelhos pegam a versão nova na próxima vez que abrirem o app com internet. Seus dados não são afetados.
-
-## E o APK?
-
-Para o que você pediu, o PWA basta: ícone, abertura direta, offline, dados salvos e backup. O APK só compensa se você precisar do app na Play Store ou de recursos nativos do Android.
-
-Se quiser mesmo um APK, depois de publicar o PWA use o PWABuilder (pwabuilder.com): informe o endereço, escolha Android e baixe o pacote. Ele cria um app que abre o mesmo site. Os dados continuam guardados no Chrome, então o backup segue necessário.
-
-Gerar um APK por conta própria exige Android Studio ou o Android SDK, que não existiam no ambiente onde este pacote foi criado. Por isso nenhum APK acompanha este pacote.
+Quando alterar o app, mude `const VERSION = 'v2';` no arquivo `sw.js` para `v3`, `v4` e assim por diante, e envie os arquivos de novo.
 
 ## Conteúdo do pacote
 
-- `index.html`: o app (mesmo visual e funções de antes, mais o cartão "Instalar no aparelho")
+- `index.html`: o app
 - `manifest.webmanifest`: nome, cores e ícones do app
 - `sw.js`: guarda o app no aparelho para abrir sem internet
+- `diagnostico.html`: verificação de instalação
 - `icons/`: ícones 192, 512, 512 adaptável (maskable), Apple e favicon
+- `.nojekyll`: arquivo vazio, opcional (arquivos que começam com ponto às vezes não aparecem no upload; o app funciona sem ele)

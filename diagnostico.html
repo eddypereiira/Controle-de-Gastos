@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagnóstico de instalação</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  :root { --bg:#eef2f0; --surface:#fff; --ink:#12201b; --muted:#5b6b65; --line:#d5ddd9; --ok:#0e6b58; --bad:#b53a2a; --warn:#a86a00; --accent:#0e6b58; --accent-ink:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0d1512; --surface:#15201c; --ink:#e6efeb; --muted:#93a59e; --line:#26352f; --ok:#4fc3a5; --bad:#f0806e; --warn:#e0a640; --accent:#4fc3a5; --accent-ink:#062a22; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 20px max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px)); }
+  main { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  h1 { margin: 0; font-size: 24px; }
+  p { margin: 0; color: var(--muted); }
+  .box { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  #resumo { font-weight: 600; }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; }
+  li .t { font-weight: 600; }
+  li .d { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+  .ok .i { color: var(--ok); } .erro .i { color: var(--bad); } .aviso .i { color: var(--warn); } .info .i { color: var(--muted); }
+  .i { font-weight: 700; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  button { font: inherit; border: 0; border-radius: 10px; padding: 12px 16px; min-height: 48px; font-weight: 600; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  textarea { width: 100%; min-height: 180px; font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Diagnóstico de instalação</h1>
+  <p>Esta página só lê os arquivos do site e o estado do Chrome. Ela não abre nem altera os seus gastos.</p>
+  <div class="box" id="resumo">Verificando...</div>
+  <div class="box"><ul id="lista"></ul></div>
+  <div class="row">
+    <button type="button" id="copiar">Copiar relatório</button>
+    <button type="button" id="instalar" class="ghost" hidden>Tentar instalar agora</button>
+    <button type="button" id="refazer" class="ghost">Verificar de novo</button>
+  </div>
+  <textarea id="rel" readonly hidden></textarea>
+  <p><a href="./">Voltar ao app</a></p>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var itens = [], promptEvt = null, gotPrompt = false;
+  var MARCA = { ok: '✓', erro: '✗', aviso: '!', info: 'i' };
+  function add(nivel, titulo, detalhe) { itens.push({ nivel: nivel, titulo: titulo, detalhe: detalhe || '' }); render(); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function render() {
+    $('lista').innerHTML = itens.map(function (x) {
+      return '<li class="' + x.nivel + '"><span class="i">' + MARCA[x.nivel] + '</span><div><div class="t">' + esc(x.titulo) + '</div>' + (x.detalhe ? '<div class="d">' + esc(x.detalhe) + '</div>' : '') + '</div></li>';
+    }).join('');
+  }
+  function bust(u) { return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'd=' + Date.now(); }
+  async function pegar(u) {
+    try { var r = await fetch(bust(u), { cache: 'no-store' }); return { status: r.status, tipo: r.headers.get('content-type') || '', buf: await r.arrayBuffer() }; }
+    catch (e) { return { status: 0, tipo: '', buf: new ArrayBuffer(0), erro: String(e) }; }
+  }
+  function texto(b) { return new TextDecoder().decode(b); }
+  function pngInfo(buf) {
+    var v = new DataView(buf); if (buf.byteLength < 24) return null;
+    var sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    for (var i = 0; i < 8; i++) if (v.getUint8(i) !== sig[i]) return null;
+    return { w: v.getUint32(16), h: v.getUint32(20) };
+  }
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); promptEvt = e; gotPrompt = true; $('instalar').hidden = false; });
+  window.addEventListener('appinstalled', function () { add('ok', 'App instalado', 'O Chrome confirmou a instalação.'); });
+
+  async function rodar() {
+    itens = []; render(); $('resumo').textContent = 'Verificando...';
+    var base = new URL('./', location.href).href;
+    var ua = navigator.userAgent || '';
+    add('info', 'Endereço do site', base);
+    add(location.protocol === 'https:' ? 'ok' : (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'aviso' : 'erro'), 'HTTPS', 'Protocolo: ' + location.protocol + (window.isSecureContext ? ' (contexto seguro)' : ' (contexto NÃO seguro)'));
+    add('info', 'Navegador', ua);
+    var android = /Android/i.test(ua);
+    if (!android && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700) add('aviso', 'Modo "site para computador" parece ativo', 'No Chrome do celular, desative "Site para computador" no menu e abra de novo.');
+    var standalone = (matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    add(standalone ? 'ok' : 'info', 'Aberto como app instalado', standalone ? 'Sim, esta janela já é o app instalado.' : 'Não, está numa aba do navegador.');
+
+    // index.html e referência ao manifesto
+    var idx = await pegar(base);
+    var href = null;
+    if (idx.status === 200) { var m = texto(idx.buf).match(/<link[^>]+rel=["']manifest["'][^>]*href=["']([^"']+)["']/i); href = m && m[1]; }
+    add(idx.status === 200 ? 'ok' : 'erro', 'index.html', 'HTTP ' + idx.status + ' ' + idx.tipo + (idx.erro ? ' ' + idx.erro : ''));
+    add(href ? 'ok' : 'erro', 'index.html aponta para o manifesto', href ? 'href="' + href + '"' : 'Não encontrei <link rel="manifest"> no index.html.');
+
+    // manifesto
+    var murl = new URL(href || 'manifest.webmanifest', base).href;
+    var mr = await pegar(murl), man = null;
+    var tipoOk = /manifest\+json|application\/json/.test(mr.tipo);
+    add(mr.status === 200 ? (tipoOk ? 'ok' : 'aviso') : 'erro', 'manifest.webmanifest', 'HTTP ' + mr.status + ' ' + mr.tipo + ' em ' + murl);
+    try { man = JSON.parse(texto(mr.buf)); } catch (e) { add('erro', 'Manifesto é um JSON válido', String(e)); }
+    if (man) {
+      ['name', 'short_name', 'start_url', 'scope', 'theme_color', 'background_color'].forEach(function (k) { add(man[k] ? 'ok' : 'erro', 'Manifesto: ' + k, String(man[k] || 'ausente')); });
+      add(man.display === 'standalone' ? 'ok' : 'erro', 'Manifesto: display', String(man.display));
+      var start = new URL(man.start_url || '.', murl).href, scope = new URL(man.scope || '.', murl).href;
+      add(start.indexOf(scope) === 0 ? 'ok' : 'erro', 'start_url está dentro do escopo', 'start_url = ' + start + '  |  escopo = ' + scope);
+      var ok192 = false, ok512 = false;
+      for (var i = 0; i < (man.icons || []).length; i++) {
+        var ic = man.icons[i], iu = new URL(ic.src, murl).href, r = await pegar(iu), info = pngInfo(r.buf);
+        var real = info ? info.w + 'x' + info.h : 'não é PNG';
+        var bom = r.status === 200 && /^image\/png/.test(r.tipo) && !!info && real === ic.sizes;
+        add(bom ? 'ok' : 'erro', 'Ícone ' + ic.src + ' (' + (ic.purpose || 'any') + ')', 'HTTP ' + r.status + ' ' + r.tipo + ' | tamanho real: ' + real + ' | declarado: ' + ic.sizes);
+        var comum = !ic.purpose || /\bany\b/.test(ic.purpose);
+        if (bom && comum && ic.sizes === '192x192') ok192 = true; if (bom && comum && ic.sizes === '512x512') ok512 = true;
+      }
+      add(ok192 && ok512 ? 'ok' : 'erro', 'Ícones PNG comuns (any) de 192x192 e 512x512 acessíveis', (ok192 ? '192 ok' : '192 com problema') + ', ' + (ok512 ? '512 ok' : '512 com problema'));
+    }
+
+    // service worker
+    var sr = await pegar(new URL('sw.js', base).href);
+    add(sr.status === 200 && /javascript/.test(sr.tipo) ? 'ok' : 'erro', 'sw.js', 'HTTP ' + sr.status + ' ' + sr.tipo);
+    if (!('serviceWorker' in navigator)) add('erro', 'Service worker', 'Este navegador/contexto não oferece service workers (precisa de HTTPS).');
+    else {
+      var reg = await navigator.serviceWorker.getRegistration(base);
+      if (!reg) { try { reg = await navigator.serviceWorker.register('sw.js'); add('aviso', 'Service worker não estava registrado', 'Registrei agora. Se aparecer registrado abaixo, abra o app uma vez e verifique de novo.'); } catch (e) { add('erro', 'Registro do service worker falhou', String(e)); } }
+      if (reg) {
+        try { await Promise.race([navigator.serviceWorker.ready, new Promise(function (_, rj) { setTimeout(function () { rj(new Error('tempo esgotado')); }, 6000); })]); } catch (e) {}
+        reg = await navigator.serviceWorker.getRegistration(base);
+        var w = reg && (reg.active || reg.waiting || reg.installing);
+        add(reg && reg.active ? 'ok' : 'erro', 'Service worker ativo', reg ? 'estado: ' + (w ? w.state : 'sem worker') + ' | escopo: ' + reg.scope : 'sem registro');
+        if (reg) add(base.indexOf(reg.scope) === 0 ? 'ok' : 'erro', 'Escopo do service worker cobre o app', reg.scope);
+        add(navigator.serviceWorker.controller ? 'ok' : 'aviso', 'Esta página é controlada pelo service worker', navigator.serviceWorker.controller ? 'sim' : 'ainda não: recarregue a página e verifique de novo.');
+      }
+      try {
+        var nomes = await caches.keys(), linhas = [];
+        for (var k = 0; k < nomes.length; k++) { var reqs = await (await caches.open(nomes[k])).keys(); linhas.push(nomes[k] + ': ' + reqs.length + ' arquivos'); }
+        add(nomes.length ? 'ok' : 'aviso', 'Arquivos guardados para uso offline', linhas.join(' | ') || 'nenhum cache ainda');
+      } catch (e) { add('aviso', 'Cache', String(e)); }
+    }
+
+    // evento de instalação do Chrome
+    await new Promise(function (r) { setTimeout(r, 3500); });
+    if (standalone) add('info', 'Evento de instalação', 'Não se aplica: o app já está instalado.');
+    else add(gotPrompt ? 'ok' : 'aviso', 'O Chrome ofereceu a instalação (beforeinstallprompt)', gotPrompt ? 'Sim. Use o botão "Tentar instalar agora" ou o menu do Chrome.' : 'Não recebi o evento. Se tudo acima está ✓, o app pode já estar instalado, ou o Chrome ainda não avaliou (recarregue e espere alguns segundos), ou há limitação do aparelho (por exemplo, Google Play Services desatualizado).');
+
+    var e = itens.filter(function (x) { return x.nivel === 'erro'; }).length, a = itens.filter(function (x) { return x.nivel === 'aviso'; }).length;
+    $('resumo').textContent = e ? 'Encontrei ' + e + (e === 1 ? ' problema' : ' problemas') + ' (marcados com ✗). Copie o relatório e envie para análise.' : (a ? 'Nenhum erro nos arquivos, mas há ' + a + (a === 1 ? ' aviso' : ' avisos') + ' (!). Veja a lista.' : 'Tudo certo nos arquivos e no service worker.');
+  }
+  $('copiar').addEventListener('click', function () {
+    var t = 'Diagnóstico Controle de Gastos\n' + new Date().toISOString() + '\n\n' + itens.map(function (x) { return '[' + x.nivel.toUpperCase() + '] ' + x.titulo + (x.detalhe ? ' - ' + x.detalhe : ''); }).join('\n');
+    var ta = $('rel'); ta.value = t;
+    function mostrar() { ta.hidden = false; ta.focus(); ta.select(); }
+    try { navigator.clipboard.writeText(t).then(function () { $('copiar').textContent = 'Copiado'; setTimeout(function () { $('copiar').textContent = 'Copiar relatório'; }, 2000); }, mostrar); } catch (e) { mostrar(); }
+  });
+  $('instalar').addEventListener('click', function () { if (promptEvt) { promptEvt.prompt(); promptEvt = null; $('instalar').hidden = true; } });
+  $('refazer').addEventListener('click', function () { rodar(); });
+  rodar();
+})();
+</script>
+</body>
+</html>
